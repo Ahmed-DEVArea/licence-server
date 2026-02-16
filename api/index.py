@@ -14,7 +14,7 @@ Endpoints:
   POST /api/admin/deactivate  — Admin removes a machine from a key
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from upstash_redis import Redis
 import os
 import json
@@ -23,7 +23,7 @@ import hashlib
 import time
 from datetime import datetime
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='../public', static_url_path='')
 
 # ==================== CONFIG ====================
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "changeme123")
@@ -533,3 +533,9 @@ def admin_deactivate_machine():
 @app.route("/api/health", methods=["GET", "OPTIONS"])
 def health():
     return cors_response({"status": "ok", "service": "IG Tool License Server", "timestamp": time.time()})
+
+
+@app.route("/", methods=["GET"])
+def serve_dashboard():
+    """Serve the admin dashboard HTML"""
+    return send_from_directory(app.static_folder, 'index.html')
