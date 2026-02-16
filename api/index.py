@@ -657,34 +657,37 @@ def admin_stats():
     if not verify_admin(request):
         return cors_response({"success": False, "error": "Unauthorized"}, 401)
 
-    redis = get_redis()
-    all_keys = redis.smembers("all_license_keys")
+    try:
+        redis = get_redis()
+        all_keys = redis.smembers("all_license_keys")
 
-    stats = {
-        "total_keys": 0, "active": 0, "expired": 0, "revoked": 0,
-        "trial": 0, "basic": 0, "pro": 0, "agency": 0,
-        "total_machines": 0, "monthly_revenue": 0
-    }
+        stats = {
+            "total_keys": 0, "active": 0, "expired": 0, "revoked": 0,
+            "trial": 0, "basic": 0, "pro": 0, "agency": 0,
+            "total_machines": 0, "monthly_revenue": 0
+        }
 
-    if all_keys:
-        stats["total_keys"] = len(all_keys)
-        for key in all_keys:
-            lic = get_license(redis, key)
-            if not lic:
-                continue
-            tier = lic.get("tier", "basic")
-            stats[tier] = stats.get(tier, 0) + 1
-            stats["total_machines"] += len(lic.get("machines", []))
+        if all_keys:
+            stats["total_keys"] = len(all_keys)
+            for key in all_keys:
+                lic = get_license(redis, key)
+                if not lic:
+                    continue
+                tier = lic.get("tier", "basic")
+                stats[tier] = stats.get(tier, 0) + 1
+                stats["total_machines"] += len(lic.get("machines", []))
 
-            if lic.get("revoked"):
-                stats["revoked"] += 1
-            elif time.time() > lic.get("expires_at", 0):
-                stats["expired"] += 1
-            else:
-                stats["active"] += 1
-                stats["monthly_revenue"] += TIERS.get(tier, {}).get("price", 0)
+                if lic.get("revoked"):
+                    stats["revoked"] += 1
+                elif time.time() > lic.get("expires_at", 0):
+                    stats["expired"] += 1
+                else:
+                    stats["active"] += 1
+                    stats["monthly_revenue"] += TIERS.get(tier, {}).get("price", 0)
 
-    return cors_response({"success": True, "stats": stats})
+        return cors_response({"success": True, "stats": stats})
+    except Exception as e:
+        return cors_response({"success": False, "error": f"Server error: {str(e)}"}, 500)
 
 
 @app.route("/api/admin/revoke", methods=["POST", "OPTIONS"])
@@ -782,6 +785,29 @@ def admin_deactivate_machine():
 @app.route("/api/health", methods=["GET", "OPTIONS"])
 def health():
     return cors_response({"status": "ok", "service": "IG Tool License Server", "timestamp": time.time()})
+
+
+@app.route("/api/debug", methods=["GET", "OPTIONS"])
+def debug_env():
+    """Debug endpoint — check env vars and Redis connectivity"""
+    url = os.environ.get("UPSTASH_REDIS_REST_URL", "")
+    token = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "")
+    result = {
+        "has_redis_url": bool(url),
+        "redis_url_prefix": url[:30] + "..." if len(url) > 30 else url,
+        "has_redis_token": bool(token),
+        "token_length": len(token),
+        "has_admin_pw": bool(os.environ.get("ADMIN_PASSWORD", "")),
+    }
+    # Test Redis connection
+    try:
+        redis = get_redis()
+        redis.ping()
+        result["redis_connected"] = True
+    except Exception as e:
+        result["redis_connected"] = False
+        result["redis_error"] = str(e)
+    return cors_response(result)
 
 
 @app.route("/", methods=["GET"])
