@@ -325,8 +325,8 @@ TIERS = {
 def get_redis():
     """Get Upstash Redis client"""
     return Redis(
-        url=os.environ.get("UPSTASH_REDIS_REST_URL", ""),
-        token=os.environ.get("UPSTASH_REDIS_REST_TOKEN", "")
+        url=os.environ.get("UPSTASH_REDIS_REST_URL", "").strip(),
+        token=os.environ.get("UPSTASH_REDIS_REST_TOKEN", "").strip()
     )
 
 
